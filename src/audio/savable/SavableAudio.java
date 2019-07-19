@@ -4,24 +4,10 @@ import processing.core.*;
 import java.io.*;
 import javax.sound.sampled.*;
 
-/**
- * This is a template class and can be used to start a new processing Library.
- * Make sure you rename this class as well as the name of the example package
- * 'template' to your own Library naming convention.
- * 
- * (the tag example followed by the name of an example included in folder
- * 'examples' will automatically include the example in the javadoc.)
- *
- * @example Hello
- */
-
 public class SavableAudio {
-	// myParent is a reference to the parent sketch
-	PApplet myParent;
 
+	public PApplet myParent;
 	public final static String VERSION = "##library.prettyVersion##";
-	public final static String SKETCHPATH = "##sketchbook.location##";
-
 	public AudioInputStream ais;
 	public int bytesPerFrame;
 
@@ -29,8 +15,7 @@ public class SavableAudio {
 	 * a Constructor, usually called in the setup() method in your sketch to
 	 * initialize and start the Library.
 	 * 
-	 * @example Hello
-	 * @param theParent the parent PApplet
+	 * @param [path to the file]
 	 */
 	public SavableAudio() {
 		ais = null;
@@ -49,31 +34,29 @@ public class SavableAudio {
 				bytesPerFrame = 1;
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
+			// e.printStackTrace();
 		}
 	}
-	
+
 	public SavableAudio(SavableAudio audio) {
 		ais = audio.ais;
 		bytesPerFrame = audio.bytesPerFrame;
 	}
-	
+
+	/**
+	 * Loads the audio file into an Audio Input Stream. currently only works with
+	 * .wav files.
+	 * 
+	 * @param filePath
+	 */
 	public void loadAudio(String filePath) {
-		
-		// check to see if any audio is loaded
-		if (ais == null) {
-			System.out.println("Audio not yet loaded.");
-			System.out.println("use the loadAudio function to work with audio");
-			return;
-		}
-		
+
 		// loads the audio file into an Audio Input String
 		try {
-			ais = AudioSystem.getAudioInputStream(new File(SKETCHPATH + filePath));
+			ais = AudioSystem.getAudioInputStream(new File(filePath));
 		} catch (UnsupportedAudioFileException e) {
 			e.printStackTrace();
-			System.out.println(
-					"Something went wrong with loading the song located at: " + SKETCHPATH + filePath + "\n");
+			System.out.println("Something went wrong with loading the song located at: " + filePath + "\n");
 			System.out.println("make sure that the audio file is a .wav file");
 			System.out.println("the easiest way to make one is through audacity -> export\n");
 		} catch (IOException e) {
@@ -82,17 +65,22 @@ public class SavableAudio {
 		}
 	}
 
+	/**
+	 * Saves the Audio Input Stream as a file named by a given file path.
+	 * 
+	 * @param filePath
+	 */
 	public void saveAudio(String filePath) {
-		
+
 		// check to see if any audio is loaded
 		if (ais == null) {
 			System.out.println("Audio not yet loaded.");
 			System.out.println("use the loadAudio function to work with audio");
 			return;
 		}
-		
+
 		try {
-			AudioSystem.write(ais, AudioFileFormat.Type.WAVE, new File(SKETCHPATH + filePath));
+			AudioSystem.write(ais, AudioFileFormat.Type.WAVE, new File(filePath));
 		} catch (NullPointerException e) {
 			e.printStackTrace();
 			System.out.println("No song to save, audio not loaded properly\n");
@@ -102,35 +90,45 @@ public class SavableAudio {
 		}
 	}
 
+	/**
+	 * Appends audio to another audio based from a given file path. Currently only
+	 * works with .wav files.
+	 * 
+	 * @param filePath
+	 */
 	public void appendAudio(String filePath) {
-		
+
 		// check to see if any audio is loaded
 		if (ais == null) {
-			// if the audio is not yet loaded, load the file instead of appending it to nothing
+			// if the audio is not yet loaded, load the file instead of appending it to
+			// nothing
 			loadAudio(filePath);
 			return;
 		}
-		
-		SavableAudio audio2 = new SavableAudio(SKETCHPATH + filePath);
+
+		SavableAudio audio2 = new SavableAudio(filePath);
 
 		ais = new AudioInputStream(new SequenceInputStream(ais, audio2.ais), ais.getFormat(),
 				ais.getFrameLength() + audio2.ais.getFrameLength());
-
-		// for some reason only saving and reloading the file gets it to work
-		saveAudio("data/temp.wav");
-		loadAudio("data/teml.wav");
 	}
 
-	// note: will need to add the audio fade here.
+	/**
+	 * Mixes two audio inputs together such that they both play at the same time
+	 * (like adding background music to an audio track). Also includes the option to
+	 * add a fade at the end of the overall audio.
+	 * 
+	 * @param filePath
+	 * @param [fadeLength]
+	 */
 	public void mixAudio(String filePath, int fadeLength) {
-		
+
 		// check to see if any audio is loaded
 		if (ais == null) {
 			System.out.println("Audio not yet loaded.");
 			System.out.println("use the loadAudio function to work with audio");
 			return;
 		}
-		
+
 		SavableAudio bkgMusic = new SavableAudio(filePath);
 
 		if (bkgMusic.bytesPerFrame != bytesPerFrame) {
@@ -197,13 +195,31 @@ public class SavableAudio {
 		ais = comb;
 	}
 
-	// function that returns the length of the audio sample in seconds
+	public void mixAudio(String filePath) {
+		mixAudio(filePath, 0);
+	}
+
+	/**
+	 * returns the length of the audio sample in seconds
+	 * 
+	 * @return double
+	 */
 	public double getLength() {
 		double soundLength = ais.getFrameLength() / 22500.0;
 		return soundLength;
 	}
 
-	// https://rosettacode.org/wiki/Map_range
+	/**
+	 * helper function used to map one range to another. Found here:
+	 * https://rosettacode.org/wiki/Map_range
+	 * 
+	 * @param a1
+	 * @param a2
+	 * @param b1
+	 * @param b2
+	 * @param s
+	 * @return
+	 */
 	private double mapRange(double a1, double a2, double b1, double b2, double s) {
 		return b1 + ((s - a1) * (b2 - b1)) / (a2 - a1);
 	}
