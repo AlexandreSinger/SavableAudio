@@ -1,21 +1,20 @@
 package audio.savable;
 
-import processing.core.*;
-import java.io.*;
-import javax.sound.sampled.*;
+//import processing.core.*;
+//import java.io.*;
+//import javax.sound.sampled.*;
 
-//import java.io.File;
-//import java.io.IOException;
-//import java.io.ByteArrayInputStream;
-//import javax.sound.sampled.AudioInputStream;
-//import javax.sound.sampled.AudioFormat;
-//import javax.sound.sampled.AudioSystem;
-//import javax.sound.sampled.AudioFileFormat;
-//import javax.sound.sampled.UnsupportedAudioFileException;
+import java.io.File;
+import java.io.IOException;
+import java.io.ByteArrayInputStream;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.AudioFileFormat;
+import javax.sound.sampled.UnsupportedAudioFileException;
+import java.io.FileNotFoundException;
 
 public class SavableAudio {
-
-	public PApplet myParent;
 	public final static String VERSION = "##library.prettyVersion##";
 	public AudioInputStream ais;
 	public int bytesPerFrame;
@@ -36,7 +35,7 @@ public class SavableAudio {
 	}
 
 	public SavableAudio(String filePath) {
-		loadAudio(filePath);
+		load(filePath);
 	}
 
 	public SavableAudio(SavableAudio audio) {
@@ -50,13 +49,12 @@ public class SavableAudio {
 	 * 
 	 * @param filePath
 	 */
-	public void loadAudio(String filePath) {
-
+	public void load(String filePath) {
 		String extension = filePath.substring(filePath.lastIndexOf(".") + 1);
-		// loads the audio file into an Audio Input String
 		try {
 			if (extension.equals("mp3")) {
 				System.out.println("Cannot load audio from mp3 file\nConvert file to wav format\n");
+				ais = null;
 				return;
 			} else {
 				ais = AudioSystem.getAudioInputStream(new File(filePath));
@@ -66,15 +64,18 @@ public class SavableAudio {
 			System.out.println("Something went wrong with loading the song located at: " + filePath + "\n");
 			System.out.println("make sure that the audio file is a .wav file");
 			System.out.println("the easiest way to make one is through audacity -> export\n");
+			ais = null;
 			return;
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 			System.out.println(
 					"File not found: Be sure that you provided the correct file path and that the file exists\n");
+			ais = null;
 			return;
 		} catch (IOException e) {
 			e.printStackTrace();
 			System.out.println("an I/O exception occured when loading the audio\n");
+			ais = null;
 			return;
 		}
 
@@ -86,24 +87,18 @@ public class SavableAudio {
 	 * 
 	 */
 	private void loadInfo() {
-		try {
-			AudioFormat aisFormat = ais.getFormat();
+		AudioFormat aisFormat = ais.getFormat();
 
-			bytesPerFrame = aisFormat.getFrameSize();
-			if (bytesPerFrame == AudioSystem.NOT_SPECIFIED) {
-				// some audio formats may have unspecified frame size
-				// in that case we may read any amount of bytes
-				bytesPerFrame = 1;
-			}
-			sampleRate = (int) aisFormat.getSampleRate();
-			channels = aisFormat.getChannels();
-			frameRate = (int) aisFormat.getFrameRate();
-			bitsPerSample = aisFormat.getSampleSizeInBits();
-		} catch (Exception e) {
-			e.printStackTrace();
-			System.out.println("Unable to load information from the audio stream\n");
-			return;
+		bytesPerFrame = aisFormat.getFrameSize();
+		if (bytesPerFrame == AudioSystem.NOT_SPECIFIED) {
+			// some audio formats may have unspecified frame size
+			// in that case we may read any amount of bytes
+			bytesPerFrame = 1;
 		}
+		sampleRate = (int) aisFormat.getSampleRate();
+		channels = aisFormat.getChannels();
+		frameRate = (int) aisFormat.getFrameRate();
+		bitsPerSample = aisFormat.getSampleSizeInBits();
 	}
 
 	/**
@@ -111,8 +106,7 @@ public class SavableAudio {
 	 * 
 	 * @param filePath
 	 */
-	public void saveAudio(String filePath) {
-
+	public void save(String filePath) {
 		// check to see if any audio is loaded
 		if (ais == null) {
 			System.out.println("Unable to save audio: audio not yet loaded or not loaded properly.\n");
@@ -138,47 +132,48 @@ public class SavableAudio {
 	 * 
 	 * @param filePath
 	 */
-	public void appendAudio(SavableAudio audio2) {
+	public void append(String filePath) {
+		append(new SavableAudio(filePath));
+	}
 
+	public void append(SavableAudio audio2) {
 		// check to see if any audio is loaded
 		if (ais == null) {
-			// if the audio is not yet loaded, load the file instead of appending it to
-			// nothing
+			// if the audio is not yet loaded, load the file instead of appending
 			ais = audio2.ais;
 			loadInfo();
+			return;
+		}
+		if (audio2.ais == null) {
 			return;
 		}
 
 		ais = appendAIS(ais, audio2.ais);
 	}
 
-	public void appendAudio(String filePath) {
-		if (ais == null) {
-			// if the audio is not yet loaded, load the file instead of appending it to
-			// nothing
-			loadAudio(filePath);
-			return;
-		}
-		appendAudio(new SavableAudio(filePath));
-	}
-
 	private AudioInputStream appendAIS(AudioInputStream ais1, AudioInputStream ais2) {
+		// set buffers that will be the size of the byte arrays
 		int buffer1 = (int) ais1.getFrameLength() * bytesPerFrame;
 		int buffer2 = (int) ais2.getFrameLength() * bytesPerFrame;
 		int buffer3 = buffer1 + buffer2;
+
+		// declare byte arrays
 		byte[] audioBytes1 = new byte[buffer1];
 		byte[] audioBytes2 = new byte[buffer2];
 		byte[] audioBytes3 = new byte[buffer3];
 
+		// read the two audio streams into the byte arrays
 		try {
 			ais1.read(audioBytes1);
 			ais2.read(audioBytes2);
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.out.println("problem with reading the Audio Input Streams into byte arrays\n");
+			// if all fails return the first stream
 			return ais1;
 		}
 
+		// write the bytes into the third array one after the other
 		for (int i = 0; i < buffer3; i++) {
 			if (i < buffer1) {
 				audioBytes3[i] = audioBytes1[i];
@@ -187,6 +182,7 @@ public class SavableAudio {
 			}
 		}
 
+		// return the AudioInputStream version of the byte array
 		return new AudioInputStream(new ByteArrayInputStream(audioBytes3), ais.getFormat(), buffer3 / bytesPerFrame);
 	}
 
@@ -198,26 +194,28 @@ public class SavableAudio {
 	 * @param filePath
 	 * @param [fadeLength]
 	 */
-	public void mixAudio(SavableAudio bkgMusic, double fadeLength) {
+	public void mix(String filePath) {
+		mix(filePath, 0);
+	}
 
+	public void mix(SavableAudio bkgMusic, double fadeLength) {
 		// check to see if any audio is loaded
 		if (ais == null || bkgMusic.ais == null) {
-			System.out.println("One of the audio classes are not yet loaded.");
-			System.out.println("use the loadAudio function to work with audio");
+			System.out.println("One of the audio classes are not yet loaded or was not loaded properly.");
 			return;
 		}
 
-		// SavableAudio bkgMusic = new SavableAudio(filePath);
-
+		// check if both audio tracks are mono or stereo
 		if (bkgMusic.channels != channels) {
 			System.out.println(
 					"could not merge audio tracks, make sure the audio tracks have the same channel type (ie. both mono or both stereo).\n");
 			return;
 		}
 
+		// provide a warning if the sample rates do not match
 		if (bkgMusic.sampleRate != sampleRate) {
 			System.out.println(
-					"Warning: Sample rate mismatched, background audio may sound slower or faster than the input audio");
+					"Warning: Sample rates do not match, background audio may sound slower or faster than the input audio");
 		}
 
 		// Set a buffer equal to the size of the base audio times the bytes per frame.
@@ -237,9 +235,11 @@ public class SavableAudio {
 			return;
 		}
 
+		// calculate the frame at which to start fading
 		int fadeFrame = (int) (audioBytes.length - (fadeLength * sampleRate * bytesPerFrame));
 
 		// combine the bytes into one array using byte addition
+		// note: must be done two bytes at a time
 		byte[] combBytes = new byte[audioBytes.length];
 		for (int i = 0; i < audioBytes.length; i += 2) {
 			short buf1A = audioBytes[i + 1];
@@ -255,7 +255,6 @@ public class SavableAudio {
 			short buf1C;
 			short buf2C;
 
-			// (fadeFrame, audioBytes2.length) -> (1, 0)
 			double dampenerA = volume;
 			double dampenerB = bkgMusic.volume;
 			if (i > fadeFrame) {
@@ -271,19 +270,16 @@ public class SavableAudio {
 			combBytes[i + 1] = (byte) (res >> 8);
 		}
 
+		// set the byte array to the audio input stream
 		ais = new AudioInputStream(new ByteArrayInputStream(combBytes), ais.getFormat(), buffer / bytesPerFrame);
 	}
 
-	public void mixAudio(String filePath) {
-		mixAudio(filePath, 0);
+	public void mix(SavableAudio background) {
+		mix(background, 0);
 	}
 
-	public void mixAudio(SavableAudio background) {
-		mixAudio(background, 0);
-	}
-
-	public void mixAudio(String filePath, double fadeLength) {
-		mixAudio(new SavableAudio(filePath), fadeLength);
+	public void mix(String filePath, double fadeLength) {
+		mix(new SavableAudio(filePath), fadeLength);
 	}
 
 	/**
@@ -293,22 +289,6 @@ public class SavableAudio {
 	 */
 	public double getLength() {
 		return ais.getFrameLength() / (double) sampleRate;
-	}
-
-	/**
-	 * helper function used to map one range to another. (a1, a2) -> (b1, b2), using
-	 * s as the input. Formula was found here:
-	 * https://rosettacode.org/wiki/Map_range.
-	 * 
-	 * @param a1
-	 * @param a2
-	 * @param b1
-	 * @param b2
-	 * @param s
-	 * @return
-	 */
-	private double mapRange(double a1, double a2, double b1, double b2, double s) {
-		return b1 + ((s - a1) * (b2 - b1)) / (a2 - a1);
 	}
 
 	/**
@@ -329,13 +309,14 @@ public class SavableAudio {
 	public void fade(double fadeInLength, double fadeOutLength) {
 		// check to see if any audio is loaded
 		if (ais == null) {
-			System.out.println("Audio not yet loaded.");
-			System.out.println("use the loadAudio function to work with audio");
+			System.out.println("Audio not yet loaded, cannot fade");
 			return;
 		}
 
+		// set a buffer for the size of the audio sample
 		int buffer = (int) ais.getFrameLength() * bytesPerFrame;
 
+		// load the audio sample into a byte array
 		byte[] original = new byte[buffer];
 		try {
 			ais.read(original);
@@ -345,11 +326,15 @@ public class SavableAudio {
 			return;
 		}
 
+		// create empty byte array to hold the final audio
 		byte[] faded = new byte[buffer];
 
+		// calculate the fade in and fade out frames
 		int fadeInFrame = (int) (fadeInLength * frameRate * bytesPerFrame);
 		int fadeOutFrame = original.length - (int) (fadeOutLength * frameRate * bytesPerFrame);
 
+		// load all the bytes, two at a time, and change their volumes based on the fade
+		// in and out frames
 		for (int i = 0; i < original.length; i += 2) {
 			short buf1A = original[i + 1];
 			short buf2A = original[i];
@@ -373,6 +358,7 @@ public class SavableAudio {
 			faded[i + 1] = (byte) (res >> 8);
 		}
 
+		// load the faded byte array into the audio input stream
 		ais = new AudioInputStream(new ByteArrayInputStream(faded), ais.getFormat(), buffer / bytesPerFrame);
 	}
 
@@ -396,6 +382,10 @@ public class SavableAudio {
 		}
 	}
 
+	private double mapRange(double a1, double a2, double b1, double b2, double s) {
+		return b1 + ((s - a1) * (b2 - b1)) / (a2 - a1);
+	}
+
 	/**
 	 * Add pauses before and after the audio sample (in seconds)
 	 * 
@@ -408,7 +398,7 @@ public class SavableAudio {
 			System.out.println("Invalid pause inputs: cannot be negative numbers");
 			return;
 		}
-		
+
 		// calculate the frame length of the front and back pauses
 		int frontPauseFrames = (int) (frontPause * sampleRate);
 		int backPauseFrames = (int) (backPause * sampleRate);
@@ -449,7 +439,7 @@ public class SavableAudio {
 			System.out.println("Or delete the audio sample, which will have the same effect");
 			return;
 		}
-		
+
 		// check for negative numbers
 		if (frontTrim < 0 || backTrim < 0) {
 			System.out.println("Invalid trim inputs: cannot be negative numbers");
