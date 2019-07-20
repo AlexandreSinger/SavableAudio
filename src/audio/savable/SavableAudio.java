@@ -292,7 +292,7 @@ public class SavableAudio {
 	 * @return double
 	 */
 	public double getLength() {
-		return ais.getFrameLength() / sampleRate;
+		return ais.getFrameLength() / (double) sampleRate;
 	}
 
 	/**
@@ -394,5 +394,92 @@ public class SavableAudio {
 			System.out.println("Invalid fade type: " + type);
 			break;
 		}
+	}
+
+	/**
+	 * Add pauses before and after the audio sample (in seconds)
+	 * 
+	 * @param frontPause
+	 * @param backPause
+	 */
+	public void addPause(double frontPause, double backPause) {
+		// check for negative numbers
+		if (frontPause < 0 || backPause < 0) {
+			System.out.println("Invalid pause inputs: cannot be negative numbers");
+			return;
+		}
+		
+		// calculate the frame length of the front and back pauses
+		int frontPauseFrames = (int) (frontPause * sampleRate);
+		int backPauseFrames = (int) (backPause * sampleRate);
+
+		// using their frame lengths, create byte arrays that are the length of the
+		// pauses
+		byte[] frontPauseBytes = new byte[frontPauseFrames * bytesPerFrame];
+		byte[] backPauseBytes = new byte[backPauseFrames * bytesPerFrame];
+
+		// convert the byte arrays to AudioInputStreams
+		AudioInputStream frontAIS = new AudioInputStream(new ByteArrayInputStream(frontPauseBytes), ais.getFormat(),
+				frontPauseFrames);
+		AudioInputStream backAIS = new AudioInputStream(new ByteArrayInputStream(backPauseBytes), ais.getFormat(),
+				backPauseFrames);
+
+		// append the front, middle, and end input streams together
+		ais = appendAIS(frontAIS, ais);
+		ais = appendAIS(ais, backAIS);
+	}
+
+	/**
+	 * Trim audio off the front and end of the audio sample (in seconds);
+	 * 
+	 * @param frontTrim
+	 * @param backTrim
+	 */
+	public void trim(double frontTrim, double backTrim) {
+		// check to see if any audio is loaded
+		if (ais == null) {
+			System.out.println("Audio not yet loaded: No audio to trim.");
+			return;
+		}
+
+		// check if the trim will trim more than the length of the audio sample
+		if (getLength() < frontTrim + backTrim) {
+			System.out.println(
+					"You are trying to trim more than the audio sample, shorten the length you want to trim the front or back of the audio sample");
+			System.out.println("Or delete the audio sample, which will have the same effect");
+			return;
+		}
+		
+		// check for negative numbers
+		if (frontTrim < 0 || backTrim < 0) {
+			System.out.println("Invalid trim inputs: cannot be negative numbers");
+			return;
+		}
+
+		// load the audio sample into a byte array
+		int buffer = (int) ais.getFrameLength() * bytesPerFrame;
+		byte[] original = new byte[buffer];
+		try {
+			ais.read(original);
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.out.println("problem with reading the Audio Input Streams into byte arrays\n");
+			return;
+		}
+
+		// create a byte array with the frame length equal to the final trimmed audio
+		// sample
+		int trimmedFrameLength = (int) (ais.getFrameLength() - (frontTrim * sampleRate) - (backTrim * sampleRate));
+		byte[] trimmedBytes = new byte[trimmedFrameLength * bytesPerFrame];
+
+		// copy each byte (starting after the front byte length) into the trimmed byte
+		// array
+		int frontByteLength = (int) (frontTrim * sampleRate * bytesPerFrame);
+		for (int i = 0; i < trimmedBytes.length; i++) {
+			trimmedBytes[i] = original[i + frontByteLength];
+		}
+
+		// set the audio sample to this trimmed byte array
+		ais = new AudioInputStream(new ByteArrayInputStream(trimmedBytes), ais.getFormat(), trimmedFrameLength);
 	}
 }
