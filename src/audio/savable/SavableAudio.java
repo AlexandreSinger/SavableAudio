@@ -2,8 +2,11 @@ package audio.savable;
 
 import processing.core.*;
 import java.io.*;
-
 import javax.sound.sampled.*;
+
+//import java.io.File;
+//import java.io.IOException;
+//import java.io.ByteArrayInputStream;
 //import javax.sound.sampled.AudioInputStream;
 //import javax.sound.sampled.AudioFormat;
 //import javax.sound.sampled.AudioSystem;
@@ -54,6 +57,7 @@ public class SavableAudio {
 		try {
 			if (extension.equals("mp3")) {
 				System.out.println("Cannot load audio from mp3 file\nConvert file to wav format\n");
+				return;
 			} else {
 				ais = AudioSystem.getAudioInputStream(new File(filePath));
 			}
@@ -62,9 +66,16 @@ public class SavableAudio {
 			System.out.println("Something went wrong with loading the song located at: " + filePath + "\n");
 			System.out.println("make sure that the audio file is a .wav file");
 			System.out.println("the easiest way to make one is through audacity -> export\n");
+			return;
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+			System.out.println(
+					"File not found: Be sure that you provided the correct file path and that the file exists\n");
+			return;
 		} catch (IOException e) {
 			e.printStackTrace();
 			System.out.println("an I/O exception occured when loading the audio\n");
+			return;
 		}
 
 		loadInfo();
@@ -91,6 +102,7 @@ public class SavableAudio {
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.out.println("Unable to load information from the audio stream\n");
+			return;
 		}
 	}
 
@@ -103,8 +115,7 @@ public class SavableAudio {
 
 		// check to see if any audio is loaded
 		if (ais == null) {
-			System.out.println("Audio not yet loaded.");
-			System.out.println("use the loadAudio function to work with audio");
+			System.out.println("Unable to save audio: audio not yet loaded or not loaded properly.\n");
 			return;
 		}
 
@@ -113,9 +124,11 @@ public class SavableAudio {
 		} catch (NullPointerException e) {
 			e.printStackTrace();
 			System.out.println("No song to save, audio not loaded properly\n");
+			return;
 		} catch (IOException e) {
 			e.printStackTrace();
 			System.out.println("an I/O exception occured when saving the audio\n");
+			return;
 		}
 	}
 
@@ -163,6 +176,7 @@ public class SavableAudio {
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.out.println("problem with reading the Audio Input Streams into byte arrays\n");
+			return ais1;
 		}
 
 		for (int i = 0; i < buffer3; i++) {
@@ -173,10 +187,7 @@ public class SavableAudio {
 			}
 		}
 
-		AudioInputStream comb = new AudioInputStream(new ByteArrayInputStream(audioBytes3), ais.getFormat(),
-				buffer3 / bytesPerFrame);
-
-		return comb;
+		return new AudioInputStream(new ByteArrayInputStream(audioBytes3), ais.getFormat(), buffer3 / bytesPerFrame);
 	}
 
 	/**
@@ -214,24 +225,25 @@ public class SavableAudio {
 
 		// create byte arrays with their sizes equal to the buffer
 		byte[] bkgAudioBytes = new byte[buffer];
-		byte[] audioBytes2 = new byte[buffer];
+		byte[] audioBytes = new byte[buffer];
 
 		// read the data from the audio input streams into the byte arrays
 		try {
 			bkgMusic.ais.read(bkgAudioBytes);
-			ais.read(audioBytes2);
+			ais.read(audioBytes);
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.out.println("problem with reading the Audio Input Streams into byte arrays\n");
+			return;
 		}
 
-		int fadeFrame = (int) (audioBytes2.length - (fadeLength * sampleRate * bytesPerFrame));
+		int fadeFrame = (int) (audioBytes.length - (fadeLength * sampleRate * bytesPerFrame));
 
 		// combine the bytes into one array using byte addition
-		byte[] combBytes = new byte[audioBytes2.length];
-		for (int i = 0; i < audioBytes2.length; i += 2) {
-			short buf1A = audioBytes2[i + 1];
-			short buf2A = audioBytes2[i];
+		byte[] combBytes = new byte[audioBytes.length];
+		for (int i = 0; i < audioBytes.length; i += 2) {
+			short buf1A = audioBytes[i + 1];
+			short buf2A = audioBytes[i];
 			buf1A = (short) ((buf1A & 0xff) << 8);
 			buf2A = (short) (buf2A & 0xff);
 
@@ -247,8 +259,8 @@ public class SavableAudio {
 			double dampenerA = volume;
 			double dampenerB = bkgMusic.volume;
 			if (i > fadeFrame) {
-				dampenerA = mapRange(fadeFrame, audioBytes2.length, volume, 0, i);
-				dampenerB = mapRange(fadeFrame, audioBytes2.length, bkgMusic.volume, 0, i);
+				dampenerA = mapRange(fadeFrame, audioBytes.length, volume, 0, i);
+				dampenerB = mapRange(fadeFrame, audioBytes.length, bkgMusic.volume, 0, i);
 			}
 			buf1C = (short) ((buf1A * dampenerA) + (buf1B * dampenerB));
 			buf2C = (short) ((buf2A * dampenerA) + (buf2B * dampenerB));
@@ -259,13 +271,7 @@ public class SavableAudio {
 			combBytes[i + 1] = (byte) (res >> 8);
 		}
 
-		// AudioFormat outFormat = new AudioFormat(22050, 16, 1, true, false);
-
-		AudioInputStream comb = new AudioInputStream(new ByteArrayInputStream(combBytes), ais.getFormat(),
-				// outFormat,
-				buffer / bytesPerFrame);
-
-		ais = comb;
+		ais = new AudioInputStream(new ByteArrayInputStream(combBytes), ais.getFormat(), buffer / bytesPerFrame);
 	}
 
 	public void mixAudio(String filePath) {
@@ -286,8 +292,7 @@ public class SavableAudio {
 	 * @return double
 	 */
 	public double getLength() {
-		double soundLength = ais.getFrameLength() / sampleRate;
-		return soundLength;
+		return ais.getFrameLength() / sampleRate;
 	}
 
 	/**
@@ -316,7 +321,7 @@ public class SavableAudio {
 	}
 
 	/**
-	 * function to fade the audio track in and/or out
+	 * fades the audio track in and/or out
 	 * 
 	 * @param fadeInLength
 	 * @param fadeOutLength
@@ -337,6 +342,7 @@ public class SavableAudio {
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.out.println("problem with reading the Audio Input Streams into byte arrays\n");
+			return;
 		}
 
 		byte[] faded = new byte[buffer];
@@ -367,10 +373,7 @@ public class SavableAudio {
 			faded[i + 1] = (byte) (res >> 8);
 		}
 
-		AudioInputStream aisFaded = new AudioInputStream(new ByteArrayInputStream(faded), ais.getFormat(),
-				buffer / bytesPerFrame);
-
-		ais = aisFaded;
+		ais = new AudioInputStream(new ByteArrayInputStream(faded), ais.getFormat(), buffer / bytesPerFrame);
 	}
 
 	public void fade(String type, double fadeLength) {
