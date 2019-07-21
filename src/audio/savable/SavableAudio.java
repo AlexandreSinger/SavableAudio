@@ -358,7 +358,7 @@ public class SavableAudio {
 			faded[i + 1] = (byte) (res >> 8);
 		}
 
-		// load the faded byte array into the audio input stream
+		// load the faded byte array into the Audio Input Stream
 		ais = new AudioInputStream(new ByteArrayInputStream(faded), ais.getFormat(), buffer / bytesPerFrame);
 	}
 
