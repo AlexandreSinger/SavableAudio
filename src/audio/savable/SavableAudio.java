@@ -15,7 +15,6 @@ import javax.sound.sampled.AudioFileFormat;
 import javax.sound.sampled.UnsupportedAudioFileException;
 
 public class SavableAudio {
-	public final static String VERSION = "##library.prettyVersion##";
 	public AudioInputStream ais;
 	public int bytesPerFrame;
 	public int sampleRate;
@@ -188,17 +187,15 @@ public class SavableAudio {
 
 	/**
 	 * Mixes two audio inputs together such that they both play at the same time
-	 * (like adding background music to an audio track). Also includes the option to
-	 * add a fade at the end of the overall audio.
+	 * (like adding background music to an audio track).
 	 * 
 	 * @param filePath
-	 * @param [fadeLength]
 	 */
 	public void mix(String filePath) {
-		mix(filePath, 0);
+		mix(new SavableAudio(filePath));
 	}
 
-	public void mix(SavableAudio bkgMusic, double fadeLength) {
+	public void mix(SavableAudio bkgMusic) {
 		// check to see if any audio is loaded
 		if (ais == null || bkgMusic.ais == null) {
 			System.out.println("One of the audio classes are not yet loaded or was not loaded properly.");
@@ -219,7 +216,7 @@ public class SavableAudio {
 		}
 
 		// Set a buffer equal to the size of the base audio times the bytes per frame.
-		int buffer = (int) ((int) ais.getFrameLength() + sampleRate * fadeLength) * bytesPerFrame;
+		int buffer = (int) ais.getFrameLength() * bytesPerFrame;
 
 		// create byte arrays with their sizes equal to the buffer
 		byte[] bkgAudioBytes = new byte[buffer];
@@ -234,9 +231,6 @@ public class SavableAudio {
 			System.out.println("problem with reading the Audio Input Streams into byte arrays\n");
 			return;
 		}
-
-		// calculate the frame at which to start fading
-		int fadeFrame = (int) (audioBytes.length - (fadeLength * sampleRate * bytesPerFrame));
 
 		// combine the bytes into one array using byte addition
 		// note: must be done two bytes at a time
@@ -257,10 +251,7 @@ public class SavableAudio {
 
 			double dampenerA = volume;
 			double dampenerB = bkgMusic.volume;
-			if (i > fadeFrame) {
-				dampenerA = mapRange(fadeFrame, audioBytes.length, volume, 0, i);
-				dampenerB = mapRange(fadeFrame, audioBytes.length, bkgMusic.volume, 0, i);
-			}
+
 			buf1C = (short) ((buf1A * dampenerA) + (buf1B * dampenerB));
 			buf2C = (short) ((buf2A * dampenerA) + (buf2B * dampenerB));
 
@@ -274,14 +265,6 @@ public class SavableAudio {
 		ais = new AudioInputStream(new ByteArrayInputStream(combBytes), ais.getFormat(), buffer / bytesPerFrame);
 	}
 
-	public void mix(SavableAudio background) {
-		mix(background, 0);
-	}
-
-	public void mix(String filePath, double fadeLength) {
-		mix(new SavableAudio(filePath), fadeLength);
-	}
-
 	/**
 	 * returns the length of the audio sample in seconds
 	 * 
@@ -289,15 +272,6 @@ public class SavableAudio {
 	 */
 	public double getLength() {
 		return ais.getFrameLength() / (double) sampleRate;
-	}
-
-	/**
-	 * return the version of the Library.
-	 * 
-	 * @return String
-	 */
-	public static String version() {
-		return VERSION;
 	}
 
 	/**
@@ -419,6 +393,26 @@ public class SavableAudio {
 		ais = appendAIS(ais, backAIS);
 	}
 
+	public void addPause(String type, double pauseLength) {
+		switch (type) {
+		case "FRONT":
+			addPause(pauseLength, 0);
+			break;
+		case "front":
+			addPause(pauseLength, 0);
+			break;
+		case "BACK":
+			addPause(0, pauseLength);
+			break;
+		case "back":
+			addPause(0, pauseLength);
+			break;
+		default:
+			System.out.println("Invalid pause type: " + type);
+			break;
+		}
+	}
+
 	/**
 	 * Trims audio off the front and end of the audio sample (in seconds);
 	 * 
@@ -480,6 +474,26 @@ public class SavableAudio {
 		ais = new AudioInputStream(new ByteArrayInputStream(trimmedBytes), ais.getFormat(), trimmedFrameLength);
 	}
 
+	public void trim(String type, double trimLength) {
+		switch (type) {
+		case "FRONT":
+			addPause(trimLength, 0);
+			break;
+		case "front":
+			addPause(trimLength, 0);
+			break;
+		case "BACK":
+			addPause(0, trimLength);
+			break;
+		case "back":
+			addPause(0, trimLength);
+			break;
+		default:
+			System.out.println("Invalid pause type: " + type);
+			break;
+		}
+	}
+
 	/**
 	 * Sets the volume of the audio sample, with the input being a percentage with
 	 * 100% being normal.
@@ -531,7 +545,7 @@ public class SavableAudio {
 			changed[i + 1] = (byte) (res >> 8);
 		}
 
-		// load the faded byte array into the audio input stream
+		// load the changed byte array into the audio input stream
 		ais = new AudioInputStream(new ByteArrayInputStream(changed), ais.getFormat(), buffer / bytesPerFrame);
 	}
 }
