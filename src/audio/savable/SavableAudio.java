@@ -22,7 +22,7 @@ public class SavableAudio {
 	public int channels;
 	public int frameRate;
 	public int bitsPerSample;
-	public double volume = 1;
+	private double volume = 1;
 
 	/**
 	 * a Constructor, usually called in the setup() method in your sketch to
@@ -387,7 +387,7 @@ public class SavableAudio {
 	}
 
 	/**
-	 * Add pauses before and after the audio sample (in seconds)
+	 * Adds pauses before and after the audio sample (in seconds)
 	 * 
 	 * @param frontPause
 	 * @param backPause
@@ -420,7 +420,7 @@ public class SavableAudio {
 	}
 
 	/**
-	 * Trim audio off the front and end of the audio sample (in seconds);
+	 * Trims audio off the front and end of the audio sample (in seconds);
 	 * 
 	 * @param frontTrim
 	 * @param backTrim
@@ -471,5 +471,60 @@ public class SavableAudio {
 
 		// set the audio sample to this trimmed byte array
 		ais = new AudioInputStream(new ByteArrayInputStream(trimmedBytes), ais.getFormat(), trimmedFrameLength);
+	}
+
+	/**
+	 * Sets the volume of the audio sample, with the input being a percentage with
+	 * 100% being normal.
+	 * 
+	 * @param newVolume
+	 */
+	public void setVolume(double newVolume) {
+		// check to see if any audio is loaded
+		if (ais == null) {
+			System.out.println("Audio not yet loaded, cannot set the volume");
+			return;
+		}
+
+		newVolume = newVolume / 100;
+
+		volume = newVolume;
+
+		// set a buffer for the size of the audio sample
+		int buffer = (int) ais.getFrameLength() * bytesPerFrame;
+
+		// load the audio sample into a byte array
+		byte[] original = new byte[buffer];
+		try {
+			ais.read(original);
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.out.println("problem with reading the Audio Input Streams into byte arrays\n");
+			return;
+		}
+
+		// create empty byte array to hold the final audio
+		byte[] changed = new byte[buffer];
+
+		// Go through each of the bytes, two at a time, and change their volume
+		for (int i = 0; i < original.length; i += 2) {
+			short buf1A = original[i + 1];
+			short buf2A = original[i];
+			buf1A = (short) ((buf1A & 0xff) << 8);
+			buf2A = (short) (buf2A & 0xff);
+
+			double dampener = volume;
+
+			short buf1C = (short) (buf1A * dampener);
+			short buf2C = (short) (buf2A * dampener);
+
+			short res = (short) (buf1C + buf2C);
+
+			changed[i] = (byte) res;
+			changed[i + 1] = (byte) (res >> 8);
+		}
+
+		// load the faded byte array into the audio input stream
+		ais = new AudioInputStream(new ByteArrayInputStream(changed), ais.getFormat(), buffer / bytesPerFrame);
 	}
 }
