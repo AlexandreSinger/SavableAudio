@@ -7,12 +7,12 @@ package audio.savable;
 import java.io.File;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
+import java.io.FileNotFoundException;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.AudioFileFormat;
 import javax.sound.sampled.UnsupportedAudioFileException;
-import java.io.FileNotFoundException;
 
 public class SavableAudio {
 	public final static String VERSION = "##library.prettyVersion##";
@@ -465,6 +465,13 @@ public class SavableAudio {
 		// copy each byte (starting after the front byte length) into the trimmed byte
 		// array
 		int frontByteLength = (int) (frontTrim * sampleRate * bytesPerFrame);
+
+		// front Byte Length needs to be an even number (has to do with most audio
+		// having 2 bytesPerFrame
+		if (frontByteLength % 2 == 1) {
+			frontByteLength -= 1;
+		}
+
 		for (int i = 0; i < trimmedBytes.length; i++) {
 			trimmedBytes[i] = original[i + frontByteLength];
 		}
