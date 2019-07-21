@@ -548,4 +548,32 @@ public class SavableAudio {
 		// load the changed byte array into the audio input stream
 		ais = new AudioInputStream(new ByteArrayInputStream(changed), ais.getFormat(), buffer / bytesPerFrame);
 	}
+	
+	/**
+	 * Gets the audio sample as a byte array
+	 * 
+	 * @return byteArray
+	 */
+	public byte[] getBytes() {
+		// check to see if any audio is loaded
+		if (ais == null) {
+			System.out.println("Audio not yet loaded, cannot get Bytes");
+			return null;
+		}
+		
+		// set a buffer for the size of the audio sample
+		int buffer = (int) ais.getFrameLength() * bytesPerFrame;
+
+		// load the audio sample into a byte array
+		byte[] original = new byte[buffer];
+		try {
+			ais.read(original);
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.out.println("problem with reading the Audio Input Streams into byte arrays\n");
+			return null;
+		}
+		
+		return original;
+	}
 }

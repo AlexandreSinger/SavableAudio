@@ -24,7 +24,7 @@ mix(SavableAudio audio)
 * Mixes the audio sample with the sample located either in a file or in another SavableAudio class. When mixing two samples together, both samples will play at the same time.
 
 getLength()
-* Gets the length of the audio track, in seconds.
+* Returns the length of the audio track, in seconds.
 
 fade(double fadeInLength, double fadeOutLength) <br>
 fade(String type, double fadeLength)
@@ -40,3 +40,6 @@ trim(String type, double trimLength)
 
 setVolume(double newVolumePercentage)
 * Sets the volume of the audio track, in percentage, with 100% being the volume of the original audio sample and 0% being no sound.
+
+getBytes()
+* Returns the audio sample as a byte array.
