@@ -14,6 +14,11 @@ import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.AudioFileFormat;
 import javax.sound.sampled.UnsupportedAudioFileException;
 
+/**
+ * A class that allows audio files to be read, manipulated, then saved back into
+ * a file
+ *
+ */
 public class SavableAudio {
 	public AudioInputStream ais;
 	public int bytesPerFrame;
@@ -157,20 +162,9 @@ public class SavableAudio {
 		int buffer3 = buffer1 + buffer2;
 
 		// declare byte arrays
-		byte[] audioBytes1 = new byte[buffer1];
-		byte[] audioBytes2 = new byte[buffer2];
+		byte[] audioBytes1 = getBytes(ais1, buffer1);
+		byte[] audioBytes2 = getBytes(ais2, buffer2);
 		byte[] audioBytes3 = new byte[buffer3];
-
-		// read the two audio streams into the byte arrays
-		try {
-			ais1.read(audioBytes1);
-			ais2.read(audioBytes2);
-		} catch (Exception e) {
-			e.printStackTrace();
-			System.out.println("problem with reading the Audio Input Streams into byte arrays\n");
-			// if all fails return the first stream
-			return ais1;
-		}
 
 		// write the bytes into the third array one after the other
 		for (int i = 0; i < buffer3; i++) {
@@ -218,45 +212,19 @@ public class SavableAudio {
 		// Set a buffer equal to the size of the base audio times the bytes per frame.
 		int buffer = (int) ais.getFrameLength() * bytesPerFrame;
 
-		// create byte arrays with their sizes equal to the buffer
-		byte[] bkgAudioBytes = new byte[buffer];
-		byte[] audioBytes = new byte[buffer];
-
-		// read the data from the audio input streams into the byte arrays
-		try {
-			bkgMusic.ais.read(bkgAudioBytes);
-			ais.read(audioBytes);
-		} catch (Exception e) {
-			e.printStackTrace();
-			System.out.println("problem with reading the Audio Input Streams into byte arrays\n");
-			return;
-		}
+		// load the audio samples into byte arrays
+		byte[] bkgAudioBytes = getBytes(bkgMusic.ais, buffer);
+		byte[] audioBytes = getBytes(ais, buffer);
 
 		// combine the bytes into one array using byte addition
 		// note: must be done two bytes at a time
 		byte[] combBytes = new byte[audioBytes.length];
 		for (int i = 0; i < audioBytes.length; i += 2) {
-			short buf1A = audioBytes[i + 1];
-			short buf2A = audioBytes[i];
-			buf1A = (short) ((buf1A & 0xff) << 8);
-			buf2A = (short) (buf2A & 0xff);
+			// Combine bytes from both arrays into shorts, then add those together
+			short res = (short) (twoBytesToShort(audioBytes[i + 1], audioBytes[i])
+					+ twoBytesToShort(bkgAudioBytes[i + 1], bkgAudioBytes[i]));
 
-			short buf1B = bkgAudioBytes[i + 1];
-			short buf2B = bkgAudioBytes[i];
-			buf1B = (short) ((buf1B & 0xff) << 8);
-			buf2B = (short) (buf2B & 0xff);
-
-			short buf1C;
-			short buf2C;
-
-			double dampenerA = volume;
-			double dampenerB = bkgMusic.volume;
-
-			buf1C = (short) ((buf1A * dampenerA) + (buf1B * dampenerB));
-			buf2C = (short) ((buf2A * dampenerA) + (buf2B * dampenerB));
-
-			short res = (short) (buf1C + buf2C);
-
+			// Split the short into two bytes and save into combined bytes array
 			combBytes[i] = (byte) res;
 			combBytes[i + 1] = (byte) (res >> 8);
 		}
@@ -291,14 +259,7 @@ public class SavableAudio {
 		int buffer = (int) ais.getFrameLength() * bytesPerFrame;
 
 		// load the audio sample into a byte array
-		byte[] original = new byte[buffer];
-		try {
-			ais.read(original);
-		} catch (Exception e) {
-			e.printStackTrace();
-			System.out.println("problem with reading the Audio Input Streams into byte arrays\n");
-			return;
-		}
+		byte[] original = getBytes(ais, buffer);
 
 		// create empty byte array to hold the final audio
 		byte[] faded = new byte[buffer];
@@ -310,24 +271,19 @@ public class SavableAudio {
 		// load all the bytes, two at a time, and change their volumes based on the fade
 		// in and out frames
 		for (int i = 0; i < original.length; i += 2) {
-			short buf1A = original[i + 1];
-			short buf2A = original[i];
-			buf1A = (short) ((buf1A & 0xff) << 8);
-			buf2A = (short) (buf2A & 0xff);
-
+			// Declaring a dampener that fades depending on the frame
 			double dampener = 1;
 			if (i < fadeInFrame) {
 				dampener *= mapRange(0, fadeInFrame, 0, volume, i);
 			}
-
 			if (i > fadeOutFrame) {
 				dampener *= mapRange(fadeOutFrame, original.length, volume, 0, i);
 			}
-			short buf1C = (short) (buf1A * dampener);
-			short buf2C = (short) (buf2A * dampener);
 
-			short res = (short) (buf1C + buf2C);
+			// Combine two bytes to a short and multiply by the dampener
+			short res = (short) (dampener * twoBytesToShort(original[i + 1], original[i]));
 
+			// Split the short into two bytes and store in new byte array
 			faded[i] = (byte) res;
 			faded[i + 1] = (byte) (res >> 8);
 		}
@@ -442,14 +398,7 @@ public class SavableAudio {
 
 		// load the audio sample into a byte array
 		int buffer = (int) ais.getFrameLength() * bytesPerFrame;
-		byte[] original = new byte[buffer];
-		try {
-			ais.read(original);
-		} catch (Exception e) {
-			e.printStackTrace();
-			System.out.println("problem with reading the Audio Input Streams into byte arrays\n");
-			return;
-		}
+		byte[] original = getBytes(ais, buffer);
 
 		// create a byte array with the frame length equal to the final trimmed audio
 		// sample
@@ -461,7 +410,7 @@ public class SavableAudio {
 		int frontByteLength = (int) (frontTrim * sampleRate * bytesPerFrame);
 
 		// front Byte Length needs to be an even number (has to do with most audio
-		// having 2 bytesPerFrame
+		// having 2 bytesPerFrame)
 		if (frontByteLength % 2 == 1) {
 			frontByteLength -= 1;
 		}
@@ -515,40 +464,25 @@ public class SavableAudio {
 		int buffer = (int) ais.getFrameLength() * bytesPerFrame;
 
 		// load the audio sample into a byte array
-		byte[] original = new byte[buffer];
-		try {
-			ais.read(original);
-		} catch (Exception e) {
-			e.printStackTrace();
-			System.out.println("problem with reading the Audio Input Streams into byte arrays\n");
-			return;
-		}
+		byte[] original = getBytes(ais, buffer);
 
 		// create empty byte array to hold the final audio
 		byte[] changed = new byte[buffer];
 
 		// Go through each of the bytes, two at a time, and change their volume
 		for (int i = 0; i < original.length; i += 2) {
-			short buf1A = original[i + 1];
-			short buf2A = original[i];
-			buf1A = (short) ((buf1A & 0xff) << 8);
-			buf2A = (short) (buf2A & 0xff);
+			// Combine the two bytes into one short, multiplying by the new volume
+			short change = (short) (volume * twoBytesToShort(original[i + 1], original[i]));
 
-			double dampener = volume;
-
-			short buf1C = (short) (buf1A * dampener);
-			short buf2C = (short) (buf2A * dampener);
-
-			short res = (short) (buf1C + buf2C);
-
-			changed[i] = (byte) res;
-			changed[i + 1] = (byte) (res >> 8);
+			// Split short into two bytes and put them into a new byte array.
+			changed[i] = (byte) change;
+			changed[i + 1] = (byte) (change >> 8);
 		}
 
 		// load the changed byte array into the audio input stream
 		ais = new AudioInputStream(new ByteArrayInputStream(changed), ais.getFormat(), buffer / bytesPerFrame);
 	}
-	
+
 	/**
 	 * Gets the audio sample as a byte array
 	 * 
@@ -560,7 +494,7 @@ public class SavableAudio {
 			System.out.println("Audio not yet loaded, cannot get Bytes");
 			return null;
 		}
-		
+
 		// set a buffer for the size of the audio sample
 		int buffer = (int) ais.getFrameLength() * bytesPerFrame;
 
@@ -573,7 +507,28 @@ public class SavableAudio {
 			System.out.println("problem with reading the Audio Input Streams into byte arrays\n");
 			return null;
 		}
-		
+
 		return original;
+	}
+
+	private byte[] getBytes(AudioInputStream aisInput, int buffer) {
+		// load the audio sample into a byte array
+		byte[] original = new byte[buffer];
+		try {
+			aisInput.read(original);
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.out.println("problem with reading an Audio Input Streams into a byte array\n");
+			return null;
+		}
+
+		return original;
+	}
+
+	private short twoBytesToShort(byte byte1, byte byte2) {
+		// Both bytes need to be bitwise and-ed to 0xff to remove extra leading data.
+		// The first byte needs to be shifted to the left by 8 bits, then they are added
+		// together to make a short
+		return (short) (((byte1 & 0xff) << 8) + (byte2 & 0xff));
 	}
 }
