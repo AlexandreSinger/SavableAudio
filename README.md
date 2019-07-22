@@ -53,3 +53,6 @@ monoToStereo(boolean left, boolean right)
 
 stereoToMono()
 * Converts an audio sample from stereo to mono.
+
+swapEndian()
+* swaps the endian from big endian to little endian, or little endian to big endian. The current standard is little endian.

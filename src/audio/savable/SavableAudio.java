@@ -90,7 +90,7 @@ public class SavableAudio {
 	public String getInfo() {
 		return aisFormat.toString();
 	}
-	
+
 	private void loadInfo() {
 		aisFormat = ais.getFormat();
 
@@ -149,6 +149,13 @@ public class SavableAudio {
 			return;
 		}
 
+		// Check and see if they are the same Endian
+		if (aisFormat.isBigEndian() != audio2.aisFormat.isBigEndian()) {
+			System.out.println(
+					"Endian mismatch: The audio files you want to append do not have the same endian. Use the swapEndian() method on one of them");
+			return;
+		}
+
 		ais = appendAIS(ais, audio2.ais);
 	}
 
@@ -199,6 +206,13 @@ public class SavableAudio {
 					"could not merge audio tracks, make sure the audio tracks have the same channel type (ie. both mono or both stereo).\n");
 			return;
 		}
+		
+		// Check and see if they are the same Endian
+		if (aisFormat.isBigEndian() != bkgMusic.aisFormat.isBigEndian()) {
+			System.out.println(
+					"Endian mismatch: The audio files you want to mix do not have the same endian. Use the swapEndian() method on one of them");
+			return;
+		}
 
 		// provide a warning if the sample rates do not match
 		if (bkgMusic.aisFormat.getSampleRate() != aisFormat.getSampleRate()) {
@@ -222,8 +236,9 @@ public class SavableAudio {
 					+ combineBytes(bkgAudioBytes[i + 1], bkgAudioBytes[i]));
 
 			// Split the short into two bytes and save into combined bytes array
-			combBytes[i] = (byte) res;
-			combBytes[i + 1] = (byte) (res >> 8);
+			byte[] split = splitBytes(res);
+			combBytes[i] = split[0];
+			combBytes[i + 1] = split[1];
 		}
 
 		// set the byte array to the audio input stream
@@ -281,8 +296,9 @@ public class SavableAudio {
 			short res = (short) (dampener * combineBytes(original[i + 1], original[i]));
 
 			// Split the short into two bytes and store in new byte array
-			faded[i] = (byte) res;
-			faded[i + 1] = (byte) (res >> 8);
+			byte[] split = splitBytes(res);
+			faded[i] = split[0];
+			faded[i + 1] = split[1];
 		}
 
 		// load the faded byte array into the Audio Input Stream
@@ -399,7 +415,8 @@ public class SavableAudio {
 
 		// create a byte array with the frame length equal to the final trimmed audio
 		// sample
-		int trimmedFrameLength = (int) (ais.getFrameLength() - (frontTrim * aisFormat.getSampleRate()) - (backTrim * aisFormat.getSampleRate()));
+		int trimmedFrameLength = (int) (ais.getFrameLength() - (frontTrim * aisFormat.getSampleRate())
+				- (backTrim * aisFormat.getSampleRate()));
 		byte[] trimmedBytes = new byte[trimmedFrameLength * bytesPerFrame];
 
 		// copy each byte (starting after the front byte length) into the trimmed byte
@@ -472,8 +489,9 @@ public class SavableAudio {
 			short res = (short) (volume * combineBytes(original[i + 1], original[i]));
 
 			// Split short into two bytes and put them into a new byte array.
-			changed[i] = (byte) res;
-			changed[i + 1] = (byte) (res >> 8);
+			byte[] split = splitBytes(res);
+			changed[i] = split[0];
+			changed[i + 1] = split[1];
 		}
 
 		// load the changed byte array into the audio input stream
@@ -486,7 +504,7 @@ public class SavableAudio {
 	public void monoToStereo() {
 		monoToStereo(true, true);
 	}
-	
+
 	public void monoToStereo(boolean left, boolean right) {
 		// check to see if any audio is loaded
 		if (ais == null) {
@@ -510,19 +528,20 @@ public class SavableAudio {
 		// create a temporary variable to move through the stereo array
 		int j = 0;
 		for (int i = 0; i < original.length; i += 2) {
-			// Combine the bytes from the original, two at a time
-			short res = combineBytes(original[i + 1], original[i]);
+			// Grab the bytes
+			byte byte1 = original[i];
+			byte byte2 = original[i + 1];
 
 			// Set the bytes of the stereo array for left ear
 			if (left) {
-				stereo[j] = (byte) res;
-				stereo[j + 1] = (byte) (res >> 8);
+				stereo[j] = byte1;
+				stereo[j + 1] = byte2;
 			}
-			
+
 			// Set the bytes of the stereo array for the right ear
 			if (right) {
-				stereo[j + 2] = (byte) res;
-				stereo[j + 3] = (byte) (res >> 8);
+				stereo[j + 2] = byte1;
+				stereo[j + 3] = byte2;
 			}
 
 			// Iterate the temporary variable by 4
@@ -555,6 +574,13 @@ public class SavableAudio {
 			return;
 		}
 
+		// check to see if the audio is big endian
+		if (aisFormat.isBigEndian()) {
+			System.out.println(
+					"Audio sample in big endian, must be little endian. Use the swapEndian() method to change the audio sample to little endian");
+			return;
+		}
+
 		// Set a buffer equal to the length of the audio in bytes
 		int buffer = (int) ais.getFrameLength() * bytesPerFrame;
 
@@ -566,12 +592,13 @@ public class SavableAudio {
 		int j = 0;
 		for (int i = 0; i < original.length; i += 4) {
 			// Combine the bytes from the original, 2 at a time, then add those together
-			short res = (short) (combineBytes(original[i + 1], original[i])
-					+ combineBytes(original[i + 3], original[i + 2]));
+			short res = (short) ((combineBytes(original[i + 1], original[i])
+					+ combineBytes(original[i + 3], original[i + 2])) / 2);
 
 			// Set the bytes of the mono array by splitting the short
-			mono[j] = (byte) (res/2);
-			mono[j + 1] = (byte) ((res/2) >> 8);
+			byte[] split = splitBytes(res);
+			mono[j] = split[0];
+			mono[j + 1] = split[1];
 
 			// Iterate the temporary variable by 4
 			j += 2;
@@ -584,6 +611,42 @@ public class SavableAudio {
 
 		// Load the mono array into an Audio Input Stream and reload the info
 		ais = new AudioInputStream(new ByteArrayInputStream(mono), newFormat, (buffer / 2) / bytesPerFrame);
+		loadInfo();
+	}
+
+	/**
+	 * Swaps big endian for little endian and vice versa
+	 */
+	public void swapEndian() {
+		// check to see if any audio is loaded
+		if (ais == null) {
+			System.out.println("Audio not yet loaded, cannot swap endian");
+			return;
+		}
+
+		// Set a buffer equal to the length of the audio in bytes
+		int buffer = (int) ais.getFrameLength() * bytesPerFrame;
+
+		// Declare two byte arrays, the original and the swapped
+		byte[] original = getBytes(ais, buffer);
+		byte[] swapped = new byte[buffer];
+
+		// Iterate through original byte array, 2 bytes at a time
+		for (int i = 0; i < original.length; i += 2) {
+			byte byte1 = original[i];
+			byte byte2 = original[i + 1];
+
+			swapped[i] = byte2;
+			swapped[i + 1] = byte1;
+		}
+
+		// Create the swapped format which is the same but with an opposite Endian
+		AudioFormat swappedFormat = new AudioFormat(aisFormat.getEncoding(), aisFormat.getSampleRate(),
+				aisFormat.getSampleSizeInBits(), aisFormat.getChannels(), aisFormat.getFrameSize(),
+				aisFormat.getFrameRate(), !aisFormat.isBigEndian());
+
+		// Load swapped array into an AudioInputStream and reload the info
+		ais = new AudioInputStream(new ByteArrayInputStream(swapped), swappedFormat, buffer / bytesPerFrame);
 		loadInfo();
 	}
 
@@ -633,6 +696,23 @@ public class SavableAudio {
 		// Both bytes need to be bitwise and-ed to 0xff to remove extra leading data.
 		// The first byte needs to be shifted to the left by 8 bits, then they are added
 		// together to make a short
-		return (short) (((byte1 & 0xff) << 8) + (byte2 & 0xff));
+		if (aisFormat.isBigEndian()) {
+			return (short) (((byte2 & 0xff) << 8) + (byte1 & 0xff));
+		} else {
+			return (short) (((byte1 & 0xff) << 8) + (byte2 & 0xff));
+		}
+	}
+
+	private byte[] splitBytes(short comb) {
+		byte[] split = new byte[2];
+		
+		if (aisFormat.isBigEndian()) {
+			split[0] = (byte) (comb >> 8);
+			split[1] = (byte) comb;
+		} else {
+			split[0] = (byte) comb;
+			split[1] = (byte) (comb >> 8);
+		}
+		return split;
 	}
 }
