@@ -26,6 +26,9 @@ mix(SavableAudio audio)
 getLength()
 * Returns the length of the audio track, in seconds.
 
+getInfo()
+* Returns a string that describes the format of the audio, ex: "PCM_SIGNED 22050.0 Hz, 16 bit, mono, 2 bytes/frame, little-endian".
+
 fade(double fadeInLength, double fadeOutLength) <br>
 fade(String type, double fadeLength)
 * Adds fades to the beginning and end of the audio sample, with the fade in and out lengths being measured in seconds. To fade just the front or back, set the fade length equal to zero or set the "type" to either "IN" or "OUT" and then specify the fade length.
@@ -43,3 +46,10 @@ setVolume(double newVolumePercentage)
 
 getBytes()
 * Returns the audio sample as a byte array.
+
+monoToStereo() <br>
+monoToStereo(boolean left, boolean right)
+* Converts an audio sample from mono to stereo. By default, both left and right are true, therefore the audio can be heard from both speakers.
+
+stereoToMono()
+* Converts an audio sample from stereo to mono.

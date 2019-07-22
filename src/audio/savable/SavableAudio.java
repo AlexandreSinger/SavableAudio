@@ -21,11 +21,8 @@ import javax.sound.sampled.UnsupportedAudioFileException;
  */
 public class SavableAudio {
 	public AudioInputStream ais;
+	public AudioFormat aisFormat;
 	public int bytesPerFrame;
-	public int sampleRate;
-	public int channels;
-	public int frameRate;
-	public int bitsPerSample;
 	private double volume = 1;
 
 	/**
@@ -90,8 +87,12 @@ public class SavableAudio {
 	 * calculates information about the audio track
 	 * 
 	 */
+	public String getInfo() {
+		return aisFormat.toString();
+	}
+	
 	private void loadInfo() {
-		AudioFormat aisFormat = ais.getFormat();
+		aisFormat = ais.getFormat();
 
 		bytesPerFrame = aisFormat.getFrameSize();
 		if (bytesPerFrame == AudioSystem.NOT_SPECIFIED) {
@@ -99,10 +100,6 @@ public class SavableAudio {
 			// in that case we may read any amount of bytes
 			bytesPerFrame = 1;
 		}
-		sampleRate = (int) aisFormat.getSampleRate();
-		channels = aisFormat.getChannels();
-		frameRate = (int) aisFormat.getFrameRate();
-		bitsPerSample = aisFormat.getSampleSizeInBits();
 	}
 
 	/**
@@ -176,7 +173,7 @@ public class SavableAudio {
 		}
 
 		// return the AudioInputStream version of the byte array
-		return new AudioInputStream(new ByteArrayInputStream(audioBytes3), ais.getFormat(), buffer3 / bytesPerFrame);
+		return new AudioInputStream(new ByteArrayInputStream(audioBytes3), aisFormat, buffer3 / bytesPerFrame);
 	}
 
 	/**
@@ -197,14 +194,14 @@ public class SavableAudio {
 		}
 
 		// check if both audio tracks are mono or stereo
-		if (bkgMusic.channels != channels) {
+		if (bkgMusic.aisFormat.getChannels() != aisFormat.getChannels()) {
 			System.out.println(
 					"could not merge audio tracks, make sure the audio tracks have the same channel type (ie. both mono or both stereo).\n");
 			return;
 		}
 
 		// provide a warning if the sample rates do not match
-		if (bkgMusic.sampleRate != sampleRate) {
+		if (bkgMusic.aisFormat.getSampleRate() != aisFormat.getSampleRate()) {
 			System.out.println(
 					"Warning: Sample rates do not match, background audio may sound slower or faster than the input audio");
 		}
@@ -221,8 +218,8 @@ public class SavableAudio {
 		byte[] combBytes = new byte[audioBytes.length];
 		for (int i = 0; i < audioBytes.length; i += 2) {
 			// Combine bytes from both arrays into shorts, then add those together
-			short res = (short) (twoBytesToShort(audioBytes[i + 1], audioBytes[i])
-					+ twoBytesToShort(bkgAudioBytes[i + 1], bkgAudioBytes[i]));
+			short res = (short) (combineBytes(audioBytes[i + 1], audioBytes[i])
+					+ combineBytes(bkgAudioBytes[i + 1], bkgAudioBytes[i]));
 
 			// Split the short into two bytes and save into combined bytes array
 			combBytes[i] = (byte) res;
@@ -230,7 +227,7 @@ public class SavableAudio {
 		}
 
 		// set the byte array to the audio input stream
-		ais = new AudioInputStream(new ByteArrayInputStream(combBytes), ais.getFormat(), buffer / bytesPerFrame);
+		ais = new AudioInputStream(new ByteArrayInputStream(combBytes), aisFormat, buffer / bytesPerFrame);
 	}
 
 	/**
@@ -239,7 +236,7 @@ public class SavableAudio {
 	 * @return double
 	 */
 	public double getLength() {
-		return ais.getFrameLength() / (double) sampleRate;
+		return ais.getFrameLength() / (double) (aisFormat.getSampleRate() * aisFormat.getChannels());
 	}
 
 	/**
@@ -265,8 +262,8 @@ public class SavableAudio {
 		byte[] faded = new byte[buffer];
 
 		// calculate the fade in and fade out frames
-		int fadeInFrame = (int) (fadeInLength * frameRate * bytesPerFrame);
-		int fadeOutFrame = original.length - (int) (fadeOutLength * frameRate * bytesPerFrame);
+		int fadeInFrame = (int) (fadeInLength * aisFormat.getFrameRate() * bytesPerFrame);
+		int fadeOutFrame = original.length - (int) (fadeOutLength * aisFormat.getFrameRate() * bytesPerFrame);
 
 		// load all the bytes, two at a time, and change their volumes based on the fade
 		// in and out frames
@@ -281,7 +278,7 @@ public class SavableAudio {
 			}
 
 			// Combine two bytes to a short and multiply by the dampener
-			short res = (short) (dampener * twoBytesToShort(original[i + 1], original[i]));
+			short res = (short) (dampener * combineBytes(original[i + 1], original[i]));
 
 			// Split the short into two bytes and store in new byte array
 			faded[i] = (byte) res;
@@ -289,7 +286,7 @@ public class SavableAudio {
 		}
 
 		// load the faded byte array into the Audio Input Stream
-		ais = new AudioInputStream(new ByteArrayInputStream(faded), ais.getFormat(), buffer / bytesPerFrame);
+		ais = new AudioInputStream(new ByteArrayInputStream(faded), aisFormat, buffer / bytesPerFrame);
 	}
 
 	public void fade(String type, double fadeLength) {
@@ -330,8 +327,8 @@ public class SavableAudio {
 		}
 
 		// calculate the frame length of the front and back pauses
-		int frontPauseFrames = (int) (frontPause * sampleRate);
-		int backPauseFrames = (int) (backPause * sampleRate);
+		int frontPauseFrames = (int) (frontPause * aisFormat.getSampleRate());
+		int backPauseFrames = (int) (backPause * aisFormat.getSampleRate());
 
 		// using their frame lengths, create byte arrays that are the length of the
 		// pauses
@@ -339,9 +336,9 @@ public class SavableAudio {
 		byte[] backPauseBytes = new byte[backPauseFrames * bytesPerFrame];
 
 		// convert the byte arrays to AudioInputStreams
-		AudioInputStream frontAIS = new AudioInputStream(new ByteArrayInputStream(frontPauseBytes), ais.getFormat(),
+		AudioInputStream frontAIS = new AudioInputStream(new ByteArrayInputStream(frontPauseBytes), aisFormat,
 				frontPauseFrames);
-		AudioInputStream backAIS = new AudioInputStream(new ByteArrayInputStream(backPauseBytes), ais.getFormat(),
+		AudioInputStream backAIS = new AudioInputStream(new ByteArrayInputStream(backPauseBytes), aisFormat,
 				backPauseFrames);
 
 		// append the front, middle, and end input streams together
@@ -402,12 +399,12 @@ public class SavableAudio {
 
 		// create a byte array with the frame length equal to the final trimmed audio
 		// sample
-		int trimmedFrameLength = (int) (ais.getFrameLength() - (frontTrim * sampleRate) - (backTrim * sampleRate));
+		int trimmedFrameLength = (int) (ais.getFrameLength() - (frontTrim * aisFormat.getSampleRate()) - (backTrim * aisFormat.getSampleRate()));
 		byte[] trimmedBytes = new byte[trimmedFrameLength * bytesPerFrame];
 
 		// copy each byte (starting after the front byte length) into the trimmed byte
 		// array
-		int frontByteLength = (int) (frontTrim * sampleRate * bytesPerFrame);
+		int frontByteLength = (int) (frontTrim * aisFormat.getSampleRate() * bytesPerFrame);
 
 		// front Byte Length needs to be an even number (has to do with most audio
 		// having 2 bytesPerFrame)
@@ -420,7 +417,7 @@ public class SavableAudio {
 		}
 
 		// set the audio sample to this trimmed byte array
-		ais = new AudioInputStream(new ByteArrayInputStream(trimmedBytes), ais.getFormat(), trimmedFrameLength);
+		ais = new AudioInputStream(new ByteArrayInputStream(trimmedBytes), aisFormat, trimmedFrameLength);
 	}
 
 	public void trim(String type, double trimLength) {
@@ -472,15 +469,122 @@ public class SavableAudio {
 		// Go through each of the bytes, two at a time, and change their volume
 		for (int i = 0; i < original.length; i += 2) {
 			// Combine the two bytes into one short, multiplying by the new volume
-			short change = (short) (volume * twoBytesToShort(original[i + 1], original[i]));
+			short res = (short) (volume * combineBytes(original[i + 1], original[i]));
 
 			// Split short into two bytes and put them into a new byte array.
-			changed[i] = (byte) change;
-			changed[i + 1] = (byte) (change >> 8);
+			changed[i] = (byte) res;
+			changed[i + 1] = (byte) (res >> 8);
 		}
 
 		// load the changed byte array into the audio input stream
-		ais = new AudioInputStream(new ByteArrayInputStream(changed), ais.getFormat(), buffer / bytesPerFrame);
+		ais = new AudioInputStream(new ByteArrayInputStream(changed), aisFormat, buffer / bytesPerFrame);
+	}
+
+	/**
+	 * Converts the audio sample from mono to stereo.
+	 */
+	public void monoToStereo() {
+		monoToStereo(true, true);
+	}
+	
+	public void monoToStereo(boolean left, boolean right) {
+		// check to see if any audio is loaded
+		if (ais == null) {
+			System.out.println("Audio not yet loaded, cannot convert from mono to stereo");
+			return;
+		}
+
+		// check to see if the audio is mono
+		if (aisFormat.getChannels() != 1) {
+			System.out.println("Audio sample not mono, cannot convert from mono to stereo");
+			return;
+		}
+
+		// Set a buffer equal to the length of the audio in bytes
+		int buffer = (int) ais.getFrameLength() * bytesPerFrame;
+
+		// Declare two byte arrays, the original and the stereo
+		byte[] original = getBytes(ais, buffer);
+		byte[] stereo = new byte[buffer * 2];
+
+		// create a temporary variable to move through the stereo array
+		int j = 0;
+		for (int i = 0; i < original.length; i += 2) {
+			// Combine the bytes from the original, two at a time
+			short res = combineBytes(original[i + 1], original[i]);
+
+			// Set the bytes of the stereo array for left ear
+			if (left) {
+				stereo[j] = (byte) res;
+				stereo[j + 1] = (byte) (res >> 8);
+			}
+			
+			// Set the bytes of the stereo array for the right ear
+			if (right) {
+				stereo[j + 2] = (byte) res;
+				stereo[j + 3] = (byte) (res >> 8);
+			}
+
+			// Iterate the temporary variable by 4
+			j += 4;
+		}
+
+		// Create a new format for stereo based off the original
+		AudioFormat oldFormat = aisFormat;
+		AudioFormat newFormat = new AudioFormat(oldFormat.getEncoding(), oldFormat.getSampleRate(), 16, 2, 4,
+				oldFormat.getFrameRate(), oldFormat.isBigEndian());
+
+		// Load the stereo array into an Audio Input Stream and reload the info
+		ais = new AudioInputStream(new ByteArrayInputStream(stereo), newFormat, (buffer * 2) / bytesPerFrame);
+		loadInfo();
+	}
+
+	/**
+	 * Converts audio sample from stereo to mono
+	 */
+	public void stereoToMono() {
+		// check to see if any audio is loaded
+		if (ais == null) {
+			System.out.println("Audio not yet loaded, cannot convert from stereo to mono");
+			return;
+		}
+
+		// check to see if the audio is stereo
+		if (aisFormat.getChannels() != 2) {
+			System.out.println("Audio sample not stereo, cannot convert from stereo to mono");
+			return;
+		}
+
+		// Set a buffer equal to the length of the audio in bytes
+		int buffer = (int) ais.getFrameLength() * bytesPerFrame;
+
+		// Declare two byte arrays, the original and the stereo
+		byte[] original = getBytes(ais, buffer);
+		byte[] mono = new byte[buffer / 2];
+
+		// create a temporary variable to move through the mono array
+		int j = 0;
+		for (int i = 0; i < original.length; i += 4) {
+			// Combine the bytes from the original, 2 at a time, then add those together
+			short res = (short) (combineBytes(original[i + 1], original[i])
+					+ combineBytes(original[i + 3], original[i + 2]));
+
+			// Set the bytes of the mono array by splitting the short
+			mono[j] = (byte) (res/2);
+			mono[j + 1] = (byte) ((res/2) >> 8);
+
+			// Iterate the temporary variable by 4
+			j += 2;
+		}
+
+		// Create a new format for mono based off the original
+		AudioFormat oldFormat = aisFormat;
+		AudioFormat newFormat = new AudioFormat(oldFormat.getEncoding(), oldFormat.getSampleRate(), 16, 1, 2,
+				oldFormat.getFrameRate(), oldFormat.isBigEndian());
+
+		// Load the mono array into an Audio Input Stream and reload the info
+		ais = new AudioInputStream(new ByteArrayInputStream(mono), newFormat, (buffer / 2) / bytesPerFrame);
+		loadInfo();
 	}
 
 	/**
@@ -525,7 +629,7 @@ public class SavableAudio {
 		return original;
 	}
 
-	private short twoBytesToShort(byte byte1, byte byte2) {
+	private short combineBytes(byte byte1, byte byte2) {
 		// Both bytes need to be bitwise and-ed to 0xff to remove extra leading data.
 		// The first byte needs to be shifted to the left by 8 bits, then they are added
 		// together to make a short
